@@ -1,49 +1,80 @@
-from fastapi import FastAPI
-from models import Student, ClassInfo
+from flask import Flask, request, jsonify
+from datetime import datetime
+import uuid
 
-app = FastAPI()
-students_db = {}
-classes_db = {}
+app = Flask(__name__)
+
+# In-memory data stores
+students = {}
+classes = {}
 registrations = {}
 
-@app.post("/student/")
-def create_student(student: Student):
-    id = len(students_db) + 1
-    students_db[id] = student
-    return {"id": id, "student": student}
+# 1. Add Student
+@app.route('/students', methods=['POST'])
+def add_student():
+    data = request.json
+    student_id = str(uuid.uuid4())
+    students[student_id] = data
+    return jsonify({"id": student_id, "message": "Student added"}), 201
 
-@app.put("/student/{student_id}")
-def update_student(student_id: int, student: Student):
-    students_db[student_id] = student
-    return {"message": "Updated"}
+# 2. Update Student
+@app.route('/students/<student_id>', methods=['PUT'])
+def update_student(student_id):
+    if student_id in students:
+        students[student_id] = request.json
+        return jsonify({"message": "Student updated"})
+    return jsonify({"error": "Student not found"}), 404
 
-@app.delete("/student/{student_id}")
-def delete_student(student_id: int):
-    students_db.pop(student_id, None)
-    return {"message": "Deleted"}
+# 3. Delete Student
+@app.route('/students/<student_id>', methods=['DELETE'])
+def delete_student(student_id):
+    if student_id in students:
+        del students[student_id]
+        return jsonify({"message": "Student deleted"})
+    return jsonify({"error": "Student not found"}), 404
 
-@app.post("/class/")
-def create_class(classinfo: ClassInfo):
-    id = len(classes_db) + 1
-    classes_db[id] = classinfo
-    return {"id": id, "class": classinfo}
+# 4. Add Class
+@app.route('/classes', methods=['POST'])
+def add_class():
+    data = request.json
+    class_id = str(uuid.uuid4())
+    classes[class_id] = data
+    return jsonify({"id": class_id, "message": "Class added"}), 201
 
-@app.put("/class/{class_id}")
-def update_class(class_id: int, classinfo: ClassInfo):
-    classes_db[class_id] = classinfo
-    return {"message": "Updated"}
+# 5. Update Class
+@app.route('/classes/<class_id>', methods=['PUT'])
+def update_class(class_id):
+    if class_id in classes:
+        classes[class_id] = request.json
+        return jsonify({"message": "Class updated"})
+    return jsonify({"error": "Class not found"}), 404
 
-@app.delete("/class/{class_id}")
-def delete_class(class_id: int):
-    classes_db.pop(class_id, None)
-    return {"message": "Deleted"}
+# 6. Delete Class
+@app.route('/classes/<class_id>', methods=['DELETE'])
+def delete_class(class_id):
+    if class_id in classes:
+        del classes[class_id]
+        return jsonify({"message": "Class deleted"})
+    return jsonify({"error": "Class not found"}), 404
 
-@app.post("/register/{student_id}/{class_id}")
-def register_student(student_id: int, class_id: int):
+# 7. Register Student to Class
+@app.route('/register', methods=['POST'])
+def register_student():
+    data = request.json
+    student_id = data.get("student_id")
+    class_id = data.get("class_id")
+    if student_id not in students or class_id not in classes:
+        return jsonify({"error": "Invalid student or class ID"}), 404
     registrations.setdefault(class_id, []).append(student_id)
-    return {"message": "Student registered"}
+    return jsonify({"message": "Student registered to class"})
 
-@app.get("/class/{class_id}/students")
-def get_registered_students(class_id: int):
-    ids = registrations.get(class_id, [])
-    return [students_db[i] for i in ids]
+# 8. Get Students for Class
+@app.route('/classes/<class_id>/students', methods=['GET'])
+def get_students_in_class(class_id):
+    student_ids = registrations.get(class_id, [])
+    result = [students[sid] for sid in student_ids if sid in students]
+    return jsonify(result)
+
+# Run the app
+if __name__ == '__main__':
+    app.run(debug=True)
